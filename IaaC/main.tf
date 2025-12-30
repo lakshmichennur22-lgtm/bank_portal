@@ -102,8 +102,8 @@ resource "aws_route_table_association" "private2" {
 # SECURITY GROUPS
 ########################################
 resource "aws_security_group" "alb_sg" {
-  vpc_id = aws_vpc.main.id
   name   = "${local.name_prefix}-alb-sg"
+  vpc_id = aws_vpc.main.id
 
   ingress {
     from_port   = 80
@@ -123,15 +123,8 @@ resource "aws_security_group" "alb_sg" {
 }
 
 resource "aws_security_group" "frontend_sg" {
-  vpc_id = aws_vpc.main.id
   name   = "${local.name_prefix}-frontend-sg"
-
-  ingress {
-    from_port                = 3000
-    to_port                  = 3000
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.alb_sg.id
-  }
+  vpc_id = aws_vpc.main.id
 
   egress {
     from_port   = 0
@@ -144,15 +137,8 @@ resource "aws_security_group" "frontend_sg" {
 }
 
 resource "aws_security_group" "backend_sg" {
-  vpc_id = aws_vpc.main.id
   name   = "${local.name_prefix}-backend-sg"
-
-  ingress {
-    from_port                = 8080
-    to_port                  = 8080
-    protocol                 = "tcp"
-    source_security_group_id = aws_security_group.alb_sg.id
-  }
+  vpc_id = aws_vpc.main.id
 
   egress {
     from_port   = 0
@@ -165,11 +151,32 @@ resource "aws_security_group" "backend_sg" {
 }
 
 ########################################
+# SECURITY GROUP RULES (PROVIDER v4 SAFE)
+########################################
+resource "aws_security_group_rule" "alb_to_frontend" {
+  type                     = "ingress"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb_sg.id
+  security_group_id        = aws_security_group.frontend_sg.id
+}
+
+resource "aws_security_group_rule" "alb_to_backend" {
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb_sg.id
+  security_group_id        = aws_security_group.backend_sg.id
+}
+
+########################################
 # VPC ENDPOINTS
 ########################################
 resource "aws_security_group" "vpce_sg" {
-  vpc_id = aws_vpc.main.id
   name   = "${local.name_prefix}-vpce-sg"
+  vpc_id = aws_vpc.main.id
 
   ingress {
     from_port   = 443
@@ -189,27 +196,27 @@ resource "aws_security_group" "vpce_sg" {
 }
 
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.us-east-1.ecr.api"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = [aws_subnet.private1.id, aws_subnet.private2.id]
-  security_group_ids  = [aws_security_group.vpce_sg.id]
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.us-east-1.ecr.api"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
+  security_group_ids = [aws_security_group.vpce_sg.id]
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.us-east-1.ecr.dkr"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = [aws_subnet.private1.id, aws_subnet.private2.id]
-  security_group_ids  = [aws_security_group.vpce_sg.id]
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.us-east-1.ecr.dkr"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
+  security_group_ids = [aws_security_group.vpce_sg.id]
 }
 
 resource "aws_vpc_endpoint" "logs" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.us-east-1.logs"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = [aws_subnet.private1.id, aws_subnet.private2.id]
-  security_group_ids  = [aws_security_group.vpce_sg.id]
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.us-east-1.logs"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
+  security_group_ids = [aws_security_group.vpce_sg.id]
 }
 
 resource "aws_vpc_endpoint" "s3" {
@@ -285,9 +292,9 @@ resource "aws_iam_role" "ecs_exec" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
+      Effect    = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
 }
@@ -298,7 +305,18 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
 }
 
 ########################################
-# ECS TASKS + SERVICES
+# LOG GROUPS
+########################################
+resource "aws_cloudwatch_log_group" "frontend" {
+  name = "/ecs/frontend"
+}
+
+resource "aws_cloudwatch_log_group" "backend" {
+  name = "/ecs/backend"
+}
+
+########################################
+# ECS TASK DEFINITIONS
 ########################################
 resource "aws_ecs_task_definition" "frontend" {
   family                   = "frontend"
@@ -321,28 +339,6 @@ resource "aws_ecs_task_definition" "frontend" {
       }
     }
   }])
-}
-
-resource "aws_ecs_service" "frontend" {
-  name            = "frontend"
-  cluster         = aws_ecs_cluster.cluster.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets         = [aws_subnet.public1.id, aws_subnet.public2.id]
-    security_groups = [aws_security_group.frontend_sg.id]
-    assign_public_ip = true
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.frontend_tg.arn
-    container_name   = "frontend"
-    container_port   = 3000
-  }
-
-  depends_on = [aws_lb_listener.http]
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -368,6 +364,31 @@ resource "aws_ecs_task_definition" "backend" {
   }])
 }
 
+########################################
+# ECS SERVICES
+########################################
+resource "aws_ecs_service" "frontend" {
+  name            = "frontend"
+  cluster         = aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.frontend.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = [aws_subnet.public1.id, aws_subnet.public2.id]
+    security_groups  = [aws_security_group.frontend_sg.id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend_tg.arn
+    container_name   = "frontend"
+    container_port   = 3000
+  }
+
+  depends_on = [aws_lb_listener.http]
+}
+
 resource "aws_ecs_service" "backend" {
   name            = "backend"
   cluster         = aws_ecs_cluster.cluster.id
@@ -376,8 +397,8 @@ resource "aws_ecs_service" "backend" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = [aws_subnet.private1.id, aws_subnet.private2.id]
-    security_groups = [aws_security_group.backend_sg.id]
+    subnets          = [aws_subnet.private1.id, aws_subnet.private2.id]
+    security_groups  = [aws_security_group.backend_sg.id]
     assign_public_ip = false
   }
 
