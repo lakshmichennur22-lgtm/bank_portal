@@ -229,7 +229,7 @@ resource "aws_vpc_endpoint" "s3" {
 # LOAD BALANCER
 ########################################
 resource "aws_lb" "alb" {
-  name               = substr("${local.name_prefix}-alb", 0, 20)
+  name               = substr("${local.name_prefix}-alb", 0, 15)
   load_balancer_type = "application"
   subnets            = [aws_subnet.public1.id, aws_subnet.public2.id]
   security_groups    = [aws_security_group.alb_sg.id]
@@ -237,7 +237,7 @@ resource "aws_lb" "alb" {
 }
 
 resource "aws_lb_target_group" "frontend_tg" {
-  name        = substr("${local.name_prefix}-frontend", 0, 20)
+  name        = substr("${local.name_prefix}-frontend", 0, 16)
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
@@ -245,7 +245,7 @@ resource "aws_lb_target_group" "frontend_tg" {
 }
 
 resource "aws_lb_target_group" "backend_tg" {
-  name        = substr("${local.name_prefix}-backend", 0, 20)
+  name        = substr("${local.name_prefix}-backend", 0, 16)
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
