@@ -2,42 +2,36 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = "us-east-1"
-        CLUSTER_NAME = "bank-portal-dev-use-cluster"     // change if different
-        SERVICE_NAME = "frontend"
+        AWS_REGION         = "us-east-1"
+        AWS_DEFAULT_REGION = "us-east-1"
+        CLUSTER_NAME       = "bank-portal-dev-use-cluster"
+        SERVICE_NAME       = "frontend"
     }
 
     stages {
 
-        stage('AWS Auth') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
-                                  credentialsId: 'Adithya']]) {
-                    sh "aws sts get-caller-identity"
-                }
-            }
-        }
-
         stage('Deploy to ECS') {
             steps {
-                sh """
-                aws ecs update-service \
-                    --cluster $CLUSTER_NAME \
-                    --service $SERVICE_NAME \
-                    --force-new-deployment \
-                    --region $AWS_REGION
-                """
-            }
-        }
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'Adithya'
+                ]]) {
 
-        stage('Wait for Deployment') {
-            steps {
-                sh """
-                aws ecs wait services-stable \
-                    --cluster $CLUSTER_NAME \
-                    --services $SERVICE_NAME \
-                    --region $AWS_REGION
-                """
+                    sh '''
+                    aws sts get-caller-identity
+
+                    aws ecs update-service \
+                        --cluster ${CLUSTER_NAME} \
+                        --service ${SERVICE_NAME} \
+                        --force-new-deployment \
+                        --region ${AWS_REGION}
+
+                    aws ecs wait services-stable \
+                        --cluster ${CLUSTER_NAME} \
+                        --services ${SERVICE_NAME} \
+                        --region ${AWS_REGION}
+                    '''
+                }
             }
         }
     }
