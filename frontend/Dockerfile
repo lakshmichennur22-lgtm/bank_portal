@@ -28,7 +28,7 @@ RUN printf "server {\n\
 }\n" > /etc/nginx/conf.d/default.conf
 
 # Copy build output (FIXED PATH)
-COPY --from=build /frontend/dist /usr/share/nginx/html
+COPY --from=build /frontend/build /usr/share/nginx/html
 
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
