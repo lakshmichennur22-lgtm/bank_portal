@@ -1,6 +1,13 @@
 pipeline {
     agent any
 
+    environment {
+        AWS_REGION = "us-east-1"
+        AWS_ACCOUNT_ID = "997948075617"
+        ECR_REPO = "bank_portal_backend_repo"
+        IMAGE_TAG = "latest"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -9,35 +16,44 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+
+        stage('AWS Login to ECR') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'Adithya']]) {
+                    sh '''
+                    aws ecr get-login-password --region $AWS_REGION \
+                    | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Build') {
             steps {
                 sh '''
-                    npm install
+                cd backend/calculator
+                docker build -t $ECR_REPO .
+                docker tag $ECR_REPO:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
                 '''
             }
         }
 
-        stage('Build Vite App') {
+        stage('Push Image to ECR') {
             steps {
                 sh '''
-                    npm run build
+                docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
                 '''
-            }
-        }
-
-        stage('Archive Build Artifacts') {
-            steps {
-                archiveArtifacts artifacts: 'build/**', fingerprint: true
             }
         }
     }
 
     post {
-         success {
-            echo '🚀 CI Deployment successful'
+        success {
+            echo "🚀 Frontend Docker image pushed successfully!"
         }
         failure {
-            echo '❌ CI Deployment failed'
+            echo "❌ Build Failed!"
         }
     }
 }
