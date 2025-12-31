@@ -2,52 +2,52 @@ pipeline {
     agent any
 
     environment {
-        AWS_DEFAULT_REGION = 'us-east-1'
-        S3_BUCKET = 'bank-portal-frontend-s3'
+        AWS_REGION = "us-east-1"
+        CLUSTER_NAME = "bank-portal-dev-use-cluster"     // change if different
+        SERVICE_NAME = "frontend"
     }
 
     stages {
 
-        stage('Download Build Artifacts') {
+        stage('AWS Auth') {
             steps {
-                copyArtifacts(
-                    projectName: 'bank-portal-frontend-ci',
-                    selector: lastSuccessful()
-                )
-            }
-        }
-
-        stage('Deploy to S3') {
-            steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'Adithya']
-                ]) {
-                    sh '''
-                        aws s3 sync  build/ s3://$S3_BUCKET --delete
-                    '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'Adithya']]) {
+                    sh "aws sts get-caller-identity"
                 }
             }
         }
 
-        stage('Print Website URL') {
+        stage('Deploy to ECS') {
             steps {
-                sh '''
-                    echo "======================================="
-                    echo "Frontend URL:"
-                    echo "http://$S3_BUCKET.s3-website-$AWS_DEFAULT_REGION.amazonaws.com"
-                    echo "======================================="
-                '''
+                sh """
+                aws ecs update-service \
+                    --cluster $CLUSTER_NAME \
+                    --service $SERVICE_NAME \
+                    --force-new-deployment \
+                    --region $AWS_REGION
+                """
+            }
+        }
+
+        stage('Wait for Deployment') {
+            steps {
+                sh """
+                aws ecs wait services-stable \
+                    --cluster $CLUSTER_NAME \
+                    --services $SERVICE_NAME \
+                    --region $AWS_REGION
+                """
             }
         }
     }
 
     post {
         success {
-            echo '🚀 CD Deployment successful'
+            echo "🚀 Deployment Successful! ECS Running New Frontend Image"
         }
         failure {
-            echo '❌ CD Deployment failed'
+            echo "❌ Deployment Failed!"
         }
     }
 }
