@@ -423,3 +423,17 @@ resource "aws_ecs_service" "backend" {
 
   depends_on = [aws_lb_listener.http]
 }
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public1.id
+}
+
+resource "aws_eip" "nat" {
+  vpc = true
+}
+
+resource "aws_route" "private_default" {
+  route_table_id         = aws_route_table.private_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat.id
+}
