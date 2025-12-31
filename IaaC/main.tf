@@ -237,7 +237,7 @@ resource "aws_lb" "alb" {
 }
 
 resource "aws_lb_target_group" "frontend_tg" {
-  name        = frontend
+  name        = "frontend"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
@@ -245,7 +245,7 @@ resource "aws_lb_target_group" "frontend_tg" {
 }
 
 resource "aws_lb_target_group" "backend_tg" {
-  name        = backend
+  name        = "backend"
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
