@@ -340,6 +340,18 @@ resource "aws_ecs_task_definition" "frontend" {
     }
   }])
 }
+resource "aws_iam_role" "ecs_task" {
+  name = "${local.name_prefix}-ecs-task"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
 
 resource "aws_ecs_task_definition" "backend" {
   family                   = "backend"
@@ -348,6 +360,7 @@ resource "aws_ecs_task_definition" "backend" {
   cpu                      = 1024
   memory                   = 2048
   execution_role_arn       = aws_iam_role.ecs_exec.arn
+  task_role_arn = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([{
     name  = "backend"
