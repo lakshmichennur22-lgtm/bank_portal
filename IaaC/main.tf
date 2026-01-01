@@ -324,3 +324,38 @@ resource "aws_ecs_service" "backend" {
     container_port   = 8080
   }
 }
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.main.id
+}
+
+resource "aws_route_table_association" "privA" {
+  subnet_id      = aws_subnet.private1.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "privB" {
+  subnet_id      = aws_subnet.private2.id
+  route_table_id = aws_route_table.private_rt.id
+}
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.region}.ecr.api"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
+  security_group_ids = [aws_security_group.backend_sg.id]
+}
+
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.region}.ecr.dkr"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
+  security_group_ids = [aws_security_group.backend_sg.id]
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private_rt.id]
+}
