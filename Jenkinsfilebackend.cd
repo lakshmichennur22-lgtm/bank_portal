@@ -4,8 +4,8 @@ pipeline {
     environment {
         AWS_REGION         = "us-east-1"
         AWS_DEFAULT_REGION = "us-east-1"
-        CLUSTER_NAME       = "bank-portal-dev-use-cluster"
-        SERVICE_NAME       = "backend"
+        CLUSTER_NAME       = "bank-portal-dev-use-ecs"
+        SERVICE_NAME       = "bank-portal-dev-use-backend"
     }
 
     stages {
