@@ -55,54 +55,41 @@ resource "aws_subnet" "private2" {
 }
 
 ########################################
-# ROUTING
+# INTERNET GATEWAY
 ########################################
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
   tags   = local.tags
 }
 
+########################################
+# ROUTE TABLES
+########################################
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.main.id
-  tags   = local.tags
 }
 
-resource "aws_route" "public_default" {
+resource "aws_route" "public_route" {
   route_table_id         = aws_route_table.public_rt.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.igw.id
 }
 
-resource "aws_route_table_association" "public1" {
+resource "aws_route_table_association" "pubA" {
   subnet_id      = aws_subnet.public1.id
   route_table_id = aws_route_table.public_rt.id
 }
 
-resource "aws_route_table_association" "public2" {
+resource "aws_route_table_association" "pubB" {
   subnet_id      = aws_subnet.public2.id
   route_table_id = aws_route_table.public_rt.id
-}
-
-resource "aws_route_table" "private_rt" {
-  vpc_id = aws_vpc.main.id
-  tags   = local.tags
-}
-
-resource "aws_route_table_association" "private1" {
-  subnet_id      = aws_subnet.private1.id
-  route_table_id = aws_route_table.private_rt.id
-}
-
-resource "aws_route_table_association" "private2" {
-  subnet_id      = aws_subnet.private2.id
-  route_table_id = aws_route_table.private_rt.id
 }
 
 ########################################
 # SECURITY GROUPS
 ########################################
 resource "aws_security_group" "alb_sg" {
-  name   = "${local.name_prefix}-alb-sg"
+  name   = "${local.name_prefix}-alb"
   vpc_id = aws_vpc.main.id
 
   ingress {
@@ -118,71 +105,17 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
-  tags = local.tags
 }
 
 resource "aws_security_group" "frontend_sg" {
-  name   = "${local.name_prefix}-frontend-sg"
-  vpc_id = aws_vpc.main.id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = local.tags
-}
-
-resource "aws_security_group" "backend_sg" {
-  name   = "${local.name_prefix}-backend-sg"
-  vpc_id = aws_vpc.main.id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = local.tags
-}
-
-########################################
-# SECURITY GROUP RULES (PROVIDER v4 SAFE)
-########################################
-resource "aws_security_group_rule" "alb_to_frontend" {
-  type                     = "ingress"
-  from_port                = 3000
-  to_port                  = 3000
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.alb_sg.id
-  security_group_id        = aws_security_group.frontend_sg.id
-}
-
-resource "aws_security_group_rule" "alb_to_backend" {
-  type                     = "ingress"
-  from_port                = 8080
-  to_port                  = 8080
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.alb_sg.id
-  security_group_id        = aws_security_group.backend_sg.id
-}
-
-########################################
-# VPC ENDPOINTS
-########################################
-resource "aws_security_group" "vpce_sg" {
-  name   = "${local.name_prefix}-vpce-sg"
+  name   = "${local.name_prefix}-frontend"
   vpc_id = aws_vpc.main.id
 
   ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    from_port                = 3000
+    to_port                  = 3000
+    protocol                 = "tcp"
+    security_groups          = [aws_security_group.alb_sg.id]
   }
 
   egress {
@@ -191,65 +124,61 @@ resource "aws_security_group" "vpce_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
-  tags = local.tags
 }
 
-resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.us-east-1.ecr.api"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
-  security_group_ids = [aws_security_group.vpce_sg.id]
-}
+resource "aws_security_group" "backend_sg" {
+  name   = "${local.name_prefix}-backend"
+  vpc_id = aws_vpc.main.id
 
-resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.us-east-1.ecr.dkr"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
-  security_group_ids = [aws_security_group.vpce_sg.id]
-}
+  ingress {
+    from_port                = 8080
+    to_port                  = 8080
+    protocol                 = "tcp"
+    security_groups          = [aws_security_group.alb_sg.id]
+  }
 
-resource "aws_vpc_endpoint" "logs" {
-  vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.us-east-1.logs"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
-  security_group_ids = [aws_security_group.vpce_sg.id]
-}
-
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id          = aws_vpc.main.id
-  service_name    = "com.amazonaws.us-east-1.s3"
-  route_table_ids = [aws_route_table.private_rt.id]
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 ########################################
 # LOAD BALANCER
 ########################################
 resource "aws_lb" "alb" {
-  name               = substr("${local.name_prefix}-alb", 0, 15)
+  name               = "${local.name_prefix}-alb"
   load_balancer_type = "application"
-  subnets            = [aws_subnet.public1.id, aws_subnet.public2.id]
   security_groups    = [aws_security_group.alb_sg.id]
-  tags               = local.tags
+  subnets            = [aws_subnet.public1.id, aws_subnet.public2.id]
 }
 
 resource "aws_lb_target_group" "frontend_tg" {
-  name        = "frontend"
+  name        = "frontend-tg"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
+
+  health_check {
+    path = "/"
+    port = "3000"
+  }
 }
 
 resource "aws_lb_target_group" "backend_tg" {
-  name        = "backend"
+  name        = "backend-tg"
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
+
+  health_check {
+    path = "/actuator/health"
+    port = "8080"
+  }
 }
 
 resource "aws_lb_listener" "http" {
@@ -263,7 +192,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-resource "aws_lb_listener_rule" "api" {
+resource "aws_lb_listener_rule" "api_rule" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 10
 
@@ -280,21 +209,26 @@ resource "aws_lb_listener_rule" "api" {
 }
 
 ########################################
-# ECS + IAM
+# ECS
 ########################################
 resource "aws_ecs_cluster" "cluster" {
   name = "${local.name_prefix}-cluster"
 }
 
+########################################
+# IAM
+########################################
 resource "aws_iam_role" "ecs_exec" {
   name = "${local.name_prefix}-ecs-exec"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ecs-tasks.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
     }]
   })
 }
@@ -305,18 +239,7 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
 }
 
 ########################################
-# LOG GROUPS
-########################################
-resource "aws_cloudwatch_log_group" "frontend" {
-  name = "/ecs/frontend"
-}
-
-resource "aws_cloudwatch_log_group" "backend" {
-  name = "/ecs/backend"
-}
-
-########################################
-# ECS TASK DEFINITIONS
+# FRONTEND TASK
 ########################################
 resource "aws_ecs_task_definition" "frontend" {
   family                   = "frontend"
@@ -326,33 +249,20 @@ resource "aws_ecs_task_definition" "frontend" {
   memory                   = 1024
   execution_role_arn       = aws_iam_role.ecs_exec.arn
 
-  container_definitions = jsonencode([{
-    name  = "frontend"
-    image = "997948075617.dkr.ecr.us-east-1.amazonaws.com/bank_portal_frontend_repo:latest"
-    portMappings = [{ containerPort = 3000 }]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = "/ecs/frontend"
-        awslogs-region        = "us-east-1"
-        awslogs-stream-prefix = "ecs"
-      }
+  container_definitions = jsonencode([
+    {
+      name  = "frontend"
+      image = var.frontend_image
+      portMappings = [{
+        containerPort = 3000
+      }]
     }
-  }])
-}
-resource "aws_iam_role" "ecs_task" {
-  name = "${local.name_prefix}-ecs-task"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
+  ])
 }
 
+########################################
+# BACKEND TASK
+########################################
 resource "aws_ecs_task_definition" "backend" {
   family                   = "backend"
   network_mode             = "awsvpc"
@@ -360,25 +270,20 @@ resource "aws_ecs_task_definition" "backend" {
   cpu                      = 1024
   memory                   = 2048
   execution_role_arn       = aws_iam_role.ecs_exec.arn
-  task_role_arn = aws_iam_role.ecs_task.arn
 
-  container_definitions = jsonencode([{
-    name  = "backend"
-    image = "997948075617.dkr.ecr.us-east-1.amazonaws.com/bank_portal_backend_repo:latest"
-    portMappings = [{ containerPort = 8080 }]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = "/ecs/backend"
-        awslogs-region        = "us-east-1"
-        awslogs-stream-prefix = "ecs"
-      }
+  container_definitions = jsonencode([
+    {
+      name  = "backend"
+      image = var.backend_image
+      portMappings = [{
+        containerPort = 8080
+      }]
     }
-  }])
+  ])
 }
 
 ########################################
-# ECS SERVICES
+# SERVICES
 ########################################
 resource "aws_ecs_service" "frontend" {
   name            = "frontend"
@@ -398,8 +303,6 @@ resource "aws_ecs_service" "frontend" {
     container_name   = "frontend"
     container_port   = 3000
   }
-
-  depends_on = [aws_lb_listener.http]
 }
 
 resource "aws_ecs_service" "backend" {
@@ -420,20 +323,4 @@ resource "aws_ecs_service" "backend" {
     container_name   = "backend"
     container_port   = 8080
   }
-
-  depends_on = [aws_lb_listener.http]
-}
-resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public1.id
-}
-
-resource "aws_eip" "nat" {
-  vpc = true
-}
-
-resource "aws_route" "private_default" {
-  route_table_id         = aws_route_table.private_rt.id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat.id
 }
