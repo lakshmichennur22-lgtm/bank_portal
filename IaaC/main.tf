@@ -339,7 +339,7 @@ resource "aws_route_table_association" "privB" {
 }
 resource "aws_vpc_endpoint" "ecr_api" {
   vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.${var.region}.ecr.api"
+  service_name      = "com.amazonaws.${var.location}.ecr.api"
   vpc_endpoint_type = "Interface"
   subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
   security_group_ids = [aws_security_group.backend_sg.id]
@@ -347,7 +347,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
   vpc_id            = aws_vpc.main.id
-  service_name      = "com.amazonaws.${var.region}.ecr.dkr"
+  service_name      = "com.amazonaws.${var.location}.ecr.dkr"
   vpc_endpoint_type = "Interface"
   subnet_ids        = [aws_subnet.private1.id, aws_subnet.private2.id]
   security_group_ids = [aws_security_group.backend_sg.id]
