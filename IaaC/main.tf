@@ -191,7 +191,8 @@ resource "aws_lb_listener_rule" "backend_rule" {
       values = ["/calculator/*"]
     }
   }
-}resource "aws_lb_target_group" "backend_tg" {
+}
+resource "aws_lb_target_group" "backend_tg" {
   name        = "${local.name_prefix}-backend-tg"
   port        = 8080
   protocol    = "HTTP"
