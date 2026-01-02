@@ -32,7 +32,7 @@ function App() {
       <main className="main-content">
         {selectedMenu === "Home" && (
           <div>
-            <h2>Welcome to HARI AND LAKSHMI BANK</h2>
+            <h2>Welcome to Adithya BANK</h2>
             <p>Your trusted digital banking portal for all financial needs.</p>
           </div>
         )}
