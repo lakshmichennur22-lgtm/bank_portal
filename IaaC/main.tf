@@ -177,7 +177,33 @@ resource "aws_lb_listener" "alb_listener" {
     target_group_arn = aws_lb_target_group.frontend_tg.arn
   }
 }
+resource "aws_lb_listener_rule" "backend_rule" {
+  listener_arn = aws_lb_listener.alb_listener.arn
+  priority     = 10
 
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/calculator/*"]
+    }
+  }
+}resource "aws_lb_target_group" "backend_tg" {
+  name        = "${local.name_prefix}-backend-tg"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/calculator/health"
+    matcher             = "200"
+    interval            = 30
+  }
+}
 ############################
 # IAM Role
 ############################

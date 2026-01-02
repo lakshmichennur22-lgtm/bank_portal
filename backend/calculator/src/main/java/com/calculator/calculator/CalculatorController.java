@@ -49,4 +49,8 @@ public class CalculatorController {
             @RequestParam double time) {
         return principal * Math.pow(1 + rate / 100, time) - principal;
     }
+    @GetMapping("/health")
+    public String health() {
+        return "OK";
+    }
 }
